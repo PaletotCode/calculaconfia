@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Request, status
 import os
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
+# Starlette 0.27 does not ship with ProxyHeadersMiddleware. Provide a
+# lightweight local implementation to keep behaviour consistent when the
+# application runs behind a reverse proxy.
+from .core.proxy_headers import ProxyHeadersMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
