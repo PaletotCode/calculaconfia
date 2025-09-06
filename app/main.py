@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, status
 import os
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 # Starlette 0.27 does not ship with ProxyHeadersMiddleware. Provide a
 # lightweight local implementation to keep behaviour consistent when the
 # application runs behind a reverse proxy.
@@ -66,13 +67,20 @@ app = FastAPI(
 
 # ===== MIDDLEWARE DE SEGURANÇA =====
 
+# Flags de controle por ambiente (para evitar loops ou bloqueios em cloud)
+USE_PROXY_HEADERS = os.getenv("USE_PROXY_HEADERS", "1") != "0"
+FORCE_HTTPS_REDIRECT = os.getenv("FORCE_HTTPS_REDIRECT", "1") == "1"
+DISABLE_TRUSTED_HOST = os.getenv("DISABLE_TRUSTED_HOST", "0") == "1"
+
 # Em ambientes atrás de proxy (Railway, etc.), respeita X-Forwarded-Proto/For
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+if USE_PROXY_HEADERS:
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 if settings.ENVIRONMENT == "production":
-    # HTTPS obrigatório em produção
-    from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
-    app.add_middleware(HTTPSRedirectMiddleware)
+    # HTTPS obrigatório em produção (pode ser desligado via env para evitar loops)
+    if FORCE_HTTPS_REDIRECT:
+        from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+        app.add_middleware(HTTPSRedirectMiddleware)
 
     # Domínios confiáveis (configuráveis via env ALLOWED_HOSTS, separados por vírgula)
     allowed_hosts_env = os.getenv("ALLOWED_HOSTS")
@@ -85,10 +93,15 @@ if settings.ENVIRONMENT == "production":
             "api.calculaconfia.com.br",
         ]
 
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=allowed_hosts
-    )
+    # TrustedHost pode ser desabilitado via env para domínios temporários
+    if not DISABLE_TRUSTED_HOST:
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=allowed_hosts
+        )
+        logger.info("TrustedHostMiddleware enabled", allowed_hosts=allowed_hosts)
+    else:
+        logger.warning("TrustedHostMiddleware disabled by env (DISABLE_TRUSTED_HOST=1)")
 
 
 # Middleware de segurança personalizado
