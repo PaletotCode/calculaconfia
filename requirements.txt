@@ -41,5 +41,5 @@ twilio
 #Pix 
 mercadopago
 
-#seilapoha
-starlette
+# Fixar versão compatível do Starlette para FastAPI 0.104.1
+starlette==0.27.0
