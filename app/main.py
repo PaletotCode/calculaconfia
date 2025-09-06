@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, status
 import os
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -61,6 +62,9 @@ app = FastAPI(
 
 
 # ===== MIDDLEWARE DE SEGURANÇA =====
+
+# Em ambientes atrás de proxy (Railway, etc.), respeita X-Forwarded-Proto/For
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 if settings.ENVIRONMENT == "production":
     # HTTPS obrigatório em produção
